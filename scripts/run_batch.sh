@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BATCH_SIZE="${BATCH_SIZE:-115}"
-DELAY_SECONDS="${DELAY_SECONDS:-5}"
-MAX_REPO_PRS="${MAX_REPO_PRS:-1010}"
+BATCH_SIZE="${BATCH_SIZE:-300}"
+DELAY_SECONDS="${DELAY_SECONDS:-10}"
+MAX_REPO_PRS="${MAX_REPO_PRS:-500}"
 COAUTHOR_TRAILER="${COAUTHOR_TRAILER:-}"
 
-if ! [[ "$BATCH_SIZE" =~ ^[0-9]+$ ]] || [ "$BATCH_SIZE" -lt 1 ] || [ "$BATCH_SIZE" -gt 150 ]; then
-  echo "::error::BATCH_SIZE must be between 1 and 150 (got: $BATCH_SIZE)."
+if ! [[ "$BATCH_SIZE" =~ ^[0-9]+$ ]] || [ "$BATCH_SIZE" -lt 1 ] || [ "$BATCH_SIZE" -gt 600 ]; then
+  echo "::error::BATCH_SIZE must be between 1 and 600 (got: $BATCH_SIZE)."
   exit 1
 fi
 
@@ -21,7 +21,7 @@ completed=0
 
 for ((i = 1; i <= BATCH_SIZE; i++)); do
   git checkout main
-  for pull_try in 1 2 3; do
+  for pull_try in 1 2 3 4; do
     if git pull --ff-only origin main; then
       break
     fi
@@ -32,8 +32,7 @@ for ((i = 1; i <= BATCH_SIZE; i++)); do
   current="${current:-0}"
 
   if [ "$current" -ge "$MAX_REPO_PRS" ]; then
-    echo "Target checkpoint ${current}/${MAX_REPO_PRS} reached (Gold unlocked). Exiting."
-    gh workflow disable pull-shark.yml 2>/dev/null || true
+    echo "Target checkpoint ${current}/${MAX_REPO_PRS} reached. Exiting."
     break
   fi
 
@@ -73,7 +72,7 @@ for ((i = 1; i <= BATCH_SIZE; i++)); do
   sleep 2
 
   pr_url=""
-  for create_attempt in 1 2 3 4; do
+  for create_attempt in 1 2 3 4 5; do
     if pr_url=$(gh pr create \
       --base main \
       --head "$branch" \
@@ -81,7 +80,7 @@ for ((i = 1; i <= BATCH_SIZE; i++)); do
       --body "Automated checkpoint sync #${next} (${ts})."); then
       break
     fi
-    sleep $((create_attempt * 20))
+    sleep $((create_attempt * 25))
   done
 
   if [ -z "$pr_url" ]; then
@@ -105,6 +104,11 @@ for ((i = 1; i <= BATCH_SIZE; i++)); do
 
   completed=$((completed + 1))
   echo "Merged checkpoint #${next} (${i}/${BATCH_SIZE})"
+
+  if [ "$next" -ge "$MAX_REPO_PRS" ]; then
+    echo "Target checkpoint ${next}/${MAX_REPO_PRS} reached. Exiting."
+    break
+  fi
 
   if [ "$i" -lt "$BATCH_SIZE" ]; then
     sleep "$DELAY_SECONDS"
