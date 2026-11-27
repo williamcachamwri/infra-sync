@@ -7,7 +7,7 @@ MAX_REPO_PRS="${MAX_REPO_PRS:-1005}"
 COAUTHOR_TRAILER="${COAUTHOR_TRAILER:-}"
 
 if ! [[ "$BATCH_SIZE" =~ ^[0-9]+$ ]] || [ "$BATCH_SIZE" -lt 1 ] || [ "$BATCH_SIZE" -gt 150 ]; then
-  echo "::error::BATCH_SIZE phải nằm trong khoảng 1..150 (hiện tại: $BATCH_SIZE) để tránh vượt ngưỡng GitHub Secondary Rate Limit (500 writes/giờ)."
+  echo "::error::BATCH_SIZE must be between 1 and 150 (got: $BATCH_SIZE)."
   exit 1
 fi
 
@@ -27,7 +27,7 @@ for ((i = 1; i <= BATCH_SIZE; i++)); do
   current="${current:-0}"
 
   if [ "$current" -ge "$MAX_REPO_PRS" ]; then
-    echo "🎉 Đã đạt mục tiêu ${current}/${MAX_REPO_PRS} PR trên repo này! Dừng tự động."
+    echo "Target checkpoint ${current}/${MAX_REPO_PRS} reached. Exiting."
     break
   fi
 
@@ -62,16 +62,13 @@ for ((i = 1; i <= BATCH_SIZE; i++)); do
       --body "Automated checkpoint sync #${next} (${ts})."); then
       break
     fi
-    echo "PR create attempt ${create_attempt} gặp gián đoạn, nghỉ $((create_attempt * 15))s rồi thử lại..."
     sleep $((create_attempt * 15))
   done
 
   if [ -z "$pr_url" ]; then
-    echo "::error::Không thể tạo PR cho nhánh ${branch}."
+    echo "::error::Failed to open PR for ${branch}."
     exit 1
   fi
-
-  echo "Created PR: $pr_url"
 
   merged=false
   for attempt in 1 2 3 4 5; do
@@ -80,16 +77,15 @@ for ((i = 1; i <= BATCH_SIZE; i++)); do
       merged=true
       break
     fi
-    echo "Merge attempt ${attempt} chưa sẵn sàng, thử lại..."
   done
 
   if [ "$merged" != "true" ]; then
-    echo "::error::Không thể merge PR ${pr_url} sau 5 lần thử."
+    echo "::error::Failed to merge ${pr_url}."
     exit 1
   fi
 
   completed=$((completed + 1))
-  echo "✅ Merged PR #${next} (${i}/${BATCH_SIZE})"
+  echo "Merged checkpoint #${next} (${i}/${BATCH_SIZE})"
 
   if [ "$i" -lt "$BATCH_SIZE" ]; then
     sleep "$DELAY_SECONDS"
@@ -98,7 +94,7 @@ done
 
 final_count=$(tr -d '[:space:]' < data/counter.txt || echo "0")
 {
-  echo "### 🦈 Pull Shark CI Summary"
-  echo "- **PR vừa merge trong phiên này:** \`${completed}\`"
-  echo "- **Tổng PR tích luỹ tại repo này:** \`${final_count} / ${MAX_REPO_PRS}\`"
+  echo "### Sync Summary"
+  echo "- **Checkpoints merged:** \`${completed}\`"
+  echo "- **Current sequence:** \`${final_count} / ${MAX_REPO_PRS}\`"
 } >> "${GITHUB_STEP_SUMMARY:-/dev/null}"

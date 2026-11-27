@@ -1,54 +1,47 @@
-name: Pull Shark CI
+name: State Sync CI
 
 on:
   schedule:
-    # Chạy 2 lần/ngày vào 10:17 và 22:43 giờ Việt Nam
     - cron: "17 3 * * *"
     - cron: "43 15 * * *"
   workflow_dispatch:
     inputs:
       batch_size:
-        description: "Số lượng PR tối đa trong lần chạy này (1-150)"
+        description: "Batch size (1-150)"
         required: false
         default: "25"
         type: string
       delay_seconds:
-        description: "Thời gian nghỉ giữa mỗi PR (giây)"
+        description: "Delay between syncs (s)"
         required: false
         default: "6"
         type: string
       max_repo_prs:
-        description: "Mốc dừng tổng PR trên repo (106 = Silver 130 PR, 1005 = Gold 1029 PR)"
+        description: "Target sequence ceiling"
         required: false
         default: "1005"
         type: string
       coauthor_trailer:
-        description: "Tuỳ chọn Co-author để cày kèm Pair Extraordinaire (VD: Name <email@example.com>)"
+        description: "Optional Co-authored-by trailer"
         required: false
         default: ""
         type: string
 
 concurrency:
-  group: pull-shark-main
+  group: infra-sync-main
   cancel-in-progress: false
 
 jobs:
-  pull-shark:
+  sync:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
-      - name: Kiểm tra Secret GH_PAT
+      - name: Check credentials
         env:
           CHECK_PAT: ${{ secrets.GH_PAT }}
         run: |
           if [ -z "$CHECK_PAT" ]; then
-            {
-              echo "### ⚠️ Chưa cấu hình Secret \`GH_PAT\`"
-              echo "GitHub không tính PR do \`GITHUB_TOKEN\` (\`github-actions[bot]\`) tạo vào badge **Pull Shark** của bạn."
-              echo ""
-              echo "Vui lòng thêm Fine-grained Personal Access Token vào **Settings -> Secrets and variables -> Actions -> New repository secret** với tên \`GH_PAT\` (quyền \`Contents: Read & write\` và \`Pull requests: Read & write\` chỉ cho repo \`pull-shark-ci\`)."
-            } >> "$GITHUB_STEP_SUMMARY"
-            echo "::error::Missing repository secret GH_PAT. See Job Summary for setup instructions."
+            echo "::error::Missing repository secret GH_PAT."
             exit 1
           fi
 
@@ -58,7 +51,7 @@ jobs:
           token: ${{ secrets.GH_PAT }}
           fetch-depth: 0
 
-      - name: Run PR batch
+      - name: Run checkpoint batch
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
           BATCH_SIZE: ${{ inputs.batch_size || vars.BATCH_SIZE || '25' }}
