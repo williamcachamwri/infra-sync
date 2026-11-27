@@ -1,0 +1,64 @@
+name: Pull Shark CI
+
+on:
+  schedule:
+    # Chạy 2 lần/ngày vào 10:17 và 22:43 giờ Việt Nam (tránh giờ tròn :00 của GitHub)
+    # 2 x 10 PR = 20 PR/ngày -> an toàn trước Secondary Rate Limit & Anti-Spam
+    - cron: "17 3 * * *"
+    - cron: "43 15 * * *"
+  workflow_dispatch:
+    inputs:
+      batch_size:
+        description: "Số lượng PR muốn tạo & merge trong lần chạy này (1-30)"
+        required: false
+        default: "10"
+        type: string
+      delay_seconds:
+        description: "Thời gian nghỉ giữa mỗi PR (giây)"
+        required: false
+        default: "8"
+        type: string
+      coauthor_trailer:
+        description: "Tuỳ chọn Co-author để cày kèm Pair Extraordinaire (VD: Name <email@example.com>)"
+        required: false
+        default: ""
+        type: string
+
+concurrency:
+  group: pull-shark-main
+  cancel-in-progress: false
+
+jobs:
+  pull-shark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Kiểm tra Secret GH_PAT
+        env:
+          CHECK_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          if [ -z "$CHECK_PAT" ]; then
+            {
+              echo "### ⚠️ Chưa cấu hình Secret \`GH_PAT\`"
+              echo "GitHub không tính PR do \`GITHUB_TOKEN\` (\`github-actions[bot]\`) tạo vào badge **Pull Shark** của bạn."
+              echo ""
+              echo "Vui lòng thêm Fine-grained Personal Access Token vào **Settings -> Secrets and variables -> Actions -> New repository secret** với tên \`GH_PAT\` (quyền \`Contents: Read & write\` và \`Pull requests: Read & write\` chỉ cho repo \`pull-shark-ci\`)."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::Missing repository secret GH_PAT. See Job Summary for setup instructions."
+            exit 1
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_PAT }}
+          fetch-depth: 0
+
+      - name: Run PR batch
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          BATCH_SIZE: ${{ inputs.batch_size || vars.BATCH_SIZE || '10' }}
+          DELAY_SECONDS: ${{ inputs.delay_seconds || vars.DELAY_SECONDS || '8' }}
+          MAX_REPO_PRS: ${{ vars.MAX_REPO_PRS || '1005' }}
+          COAUTHOR_TRAILER: ${{ inputs.coauthor_trailer || vars.COAUTHOR_TRAILER || '' }}
+        run: bash scripts/run_batch.sh
