@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BATCH_SIZE="${BATCH_SIZE:-20}"
-DELAY_SECONDS="${DELAY_SECONDS:-6}"
-MAX_REPO_PRS="${MAX_REPO_PRS:-1005}"
+BATCH_SIZE="${BATCH_SIZE:-115}"
+DELAY_SECONDS="${DELAY_SECONDS:-5}"
+MAX_REPO_PRS="${MAX_REPO_PRS:-1010}"
 COAUTHOR_TRAILER="${COAUTHOR_TRAILER:-}"
 
 if ! [[ "$BATCH_SIZE" =~ ^[0-9]+$ ]] || [ "$BATCH_SIZE" -lt 1 ] || [ "$BATCH_SIZE" -gt 150 ]; then
@@ -21,13 +21,19 @@ completed=0
 
 for ((i = 1; i <= BATCH_SIZE; i++)); do
   git checkout main
-  git pull --ff-only origin main
+  for pull_try in 1 2 3; do
+    if git pull --ff-only origin main; then
+      break
+    fi
+    sleep $((pull_try * 5))
+  done
 
   current=$(tr -d '[:space:]' < data/counter.txt)
   current="${current:-0}"
 
   if [ "$current" -ge "$MAX_REPO_PRS" ]; then
-    echo "Target checkpoint ${current}/${MAX_REPO_PRS} reached. Exiting."
+    echo "Target checkpoint ${current}/${MAX_REPO_PRS} reached (Gold unlocked). Exiting."
+    gh workflow disable pull-shark.yml 2>/dev/null || true
     break
   fi
 
@@ -50,11 +56,24 @@ for ((i = 1; i <= BATCH_SIZE; i++)); do
     git commit -m "$commit_msg"
   fi
 
-  git push -u origin "$branch"
+  pushed=false
+  for push_try in 1 2 3 4; do
+    if git push -u origin "$branch"; then
+      pushed=true
+      break
+    fi
+    sleep $((push_try * 10))
+  done
+
+  if [ "$pushed" != "true" ]; then
+    echo "::error::Failed to push branch ${branch}."
+    exit 1
+  fi
+
   sleep 2
 
   pr_url=""
-  for create_attempt in 1 2 3; do
+  for create_attempt in 1 2 3 4; do
     if pr_url=$(gh pr create \
       --base main \
       --head "$branch" \
@@ -62,7 +81,7 @@ for ((i = 1; i <= BATCH_SIZE; i++)); do
       --body "Automated checkpoint sync #${next} (${ts})."); then
       break
     fi
-    sleep $((create_attempt * 15))
+    sleep $((create_attempt * 20))
   done
 
   if [ -z "$pr_url" ]; then
@@ -71,7 +90,7 @@ for ((i = 1; i <= BATCH_SIZE; i++)); do
   fi
 
   merged=false
-  for attempt in 1 2 3 4 5; do
+  for attempt in 1 2 3 4 5 6; do
     sleep $((attempt * 3))
     if gh pr merge "$pr_url" --merge --delete-branch; then
       merged=true

@@ -2,24 +2,24 @@ name: State Sync CI
 
 on:
   schedule:
-    - cron: "17 3 * * *"
-    - cron: "43 15 * * *"
+    # Runs hourly at :07 (~115 PRs/hr => reaches 1,024+ Gold in ~8 hours safely under rate limits)
+    - cron: "7 * * * *"
   workflow_dispatch:
     inputs:
       batch_size:
         description: "Batch size (1-150)"
         required: false
-        default: "25"
+        default: "115"
         type: string
       delay_seconds:
         description: "Delay between syncs (s)"
         required: false
-        default: "6"
+        default: "5"
         type: string
       max_repo_prs:
-        description: "Target sequence ceiling"
+        description: "Target sequence ceiling (1010 + 25 existing = 1035 >= 1024 Gold)"
         required: false
-        default: "1005"
+        default: "1010"
         type: string
       coauthor_trailer:
         description: "Optional Co-authored-by trailer"
@@ -54,8 +54,8 @@ jobs:
       - name: Run checkpoint batch
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
-          BATCH_SIZE: ${{ inputs.batch_size || vars.BATCH_SIZE || '25' }}
-          DELAY_SECONDS: ${{ inputs.delay_seconds || vars.DELAY_SECONDS || '6' }}
-          MAX_REPO_PRS: ${{ inputs.max_repo_prs || vars.MAX_REPO_PRS || '1005' }}
+          BATCH_SIZE: ${{ inputs.batch_size || vars.BATCH_SIZE || '115' }}
+          DELAY_SECONDS: ${{ inputs.delay_seconds || vars.DELAY_SECONDS || '5' }}
+          MAX_REPO_PRS: ${{ inputs.max_repo_prs || vars.MAX_REPO_PRS || '1010' }}
           COAUTHOR_TRAILER: ${{ inputs.coauthor_trailer || vars.COAUTHOR_TRAILER || '' }}
         run: bash scripts/run_batch.sh
