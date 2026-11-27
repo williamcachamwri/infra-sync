@@ -2,21 +2,25 @@ name: Pull Shark CI
 
 on:
   schedule:
-    # Chạy 2 lần/ngày vào 10:17 và 22:43 giờ Việt Nam (tránh giờ tròn :00 của GitHub)
-    # 2 x 10 PR = 20 PR/ngày -> an toàn trước Secondary Rate Limit & Anti-Spam
+    # Chạy 2 lần/ngày vào 10:17 và 22:43 giờ Việt Nam
     - cron: "17 3 * * *"
     - cron: "43 15 * * *"
   workflow_dispatch:
     inputs:
       batch_size:
-        description: "Số lượng PR muốn tạo & merge trong lần chạy này (1-30)"
+        description: "Số lượng PR tối đa trong lần chạy này (1-150)"
         required: false
-        default: "10"
+        default: "25"
         type: string
       delay_seconds:
         description: "Thời gian nghỉ giữa mỗi PR (giây)"
         required: false
-        default: "8"
+        default: "6"
+        type: string
+      max_repo_prs:
+        description: "Mốc dừng tổng PR trên repo (106 = Silver 130 PR, 1005 = Gold 1029 PR)"
+        required: false
+        default: "1005"
         type: string
       coauthor_trailer:
         description: "Tuỳ chọn Co-author để cày kèm Pair Extraordinaire (VD: Name <email@example.com>)"
@@ -31,7 +35,7 @@ concurrency:
 jobs:
   pull-shark:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 90
     steps:
       - name: Kiểm tra Secret GH_PAT
         env:
@@ -57,8 +61,8 @@ jobs:
       - name: Run PR batch
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
-          BATCH_SIZE: ${{ inputs.batch_size || vars.BATCH_SIZE || '10' }}
-          DELAY_SECONDS: ${{ inputs.delay_seconds || vars.DELAY_SECONDS || '8' }}
-          MAX_REPO_PRS: ${{ vars.MAX_REPO_PRS || '1005' }}
+          BATCH_SIZE: ${{ inputs.batch_size || vars.BATCH_SIZE || '25' }}
+          DELAY_SECONDS: ${{ inputs.delay_seconds || vars.DELAY_SECONDS || '6' }}
+          MAX_REPO_PRS: ${{ inputs.max_repo_prs || vars.MAX_REPO_PRS || '1005' }}
           COAUTHOR_TRAILER: ${{ inputs.coauthor_trailer || vars.COAUTHOR_TRAILER || '' }}
         run: bash scripts/run_batch.sh
