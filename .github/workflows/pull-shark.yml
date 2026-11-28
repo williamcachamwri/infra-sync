@@ -8,7 +8,7 @@ on:
       batch_size:
         description: "Batch size (1-600)"
         required: false
-        default: "300"
+        default: "520"
         type: string
       delay_seconds:
         description: "Delay between syncs (s)"
@@ -18,7 +18,7 @@ on:
       max_repo_prs:
         description: "Target sequence ceiling"
         required: false
-        default: "500"
+        default: "1010"
         type: string
       coauthor_trailer:
         description: "Optional Co-authored-by trailer"
@@ -53,8 +53,8 @@ jobs:
       - name: Run checkpoint batch
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
-          BATCH_SIZE: ${{ inputs.batch_size || vars.BATCH_SIZE || '300' }}
+          BATCH_SIZE: ${{ inputs.batch_size || vars.BATCH_SIZE || '520' }}
           DELAY_SECONDS: ${{ inputs.delay_seconds || vars.DELAY_SECONDS || '10' }}
-          MAX_REPO_PRS: ${{ inputs.max_repo_prs || vars.MAX_REPO_PRS || '500' }}
+          MAX_REPO_PRS: ${{ inputs.max_repo_prs || vars.MAX_REPO_PRS || '1010' }}
           COAUTHOR_TRAILER: ${{ inputs.coauthor_trailer || vars.COAUTHOR_TRAILER || '' }}
         run: bash scripts/run_batch.sh

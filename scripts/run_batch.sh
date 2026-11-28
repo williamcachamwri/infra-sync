@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BATCH_SIZE="${BATCH_SIZE:-300}"
+BATCH_SIZE="${BATCH_SIZE:-520}"
 DELAY_SECONDS="${DELAY_SECONDS:-10}"
-MAX_REPO_PRS="${MAX_REPO_PRS:-500}"
+MAX_REPO_PRS="${MAX_REPO_PRS:-1010}"
 COAUTHOR_TRAILER="${COAUTHOR_TRAILER:-}"
 
 if ! [[ "$BATCH_SIZE" =~ ^[0-9]+$ ]] || [ "$BATCH_SIZE" -lt 1 ] || [ "$BATCH_SIZE" -gt 600 ]; then
